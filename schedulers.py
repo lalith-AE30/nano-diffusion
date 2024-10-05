@@ -1,4 +1,5 @@
 import torch
+from enum import Enum
 
 def cosine_beta_schedule(timesteps, s=0.008):
     """
@@ -29,3 +30,11 @@ def sigmoid_beta_schedule(timesteps):
     beta_end = 0.02
     betas = torch.linspace(-6, 6, timesteps)
     return torch.sigmoid(betas) * (beta_end - beta_start) + beta_start
+
+
+
+class Scheduler(Enum):
+    LINEAR = "linear"
+    COSINE = "cosine"
+    QUADRATIC = "quadratic"
+    SIGMOID = "sigmoid"

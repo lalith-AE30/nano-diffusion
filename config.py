@@ -2,12 +2,18 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
-from schedulers import linear_beta_schedule
-
+from schedulers import (
+    linear_beta_schedule,
+    cosine_beta_schedule,
+    quadratic_beta_schedule,
+    sigmoid_beta_schedule,
+    Scheduler
+)
 
 @dataclass
 class DiffusionConfig:
     timesteps: int
+    scheduler: Scheduler
     betas: torch.Tensor
     alphas: torch.Tensor
     alphas_cumprod: torch.Tensor
@@ -17,9 +23,22 @@ class DiffusionConfig:
     posterior_variance: torch.Tensor
 
 
-def create_diffusion_config(timesteps: int = 200) -> DiffusionConfig:
+def create_diffusion_config(
+    timesteps: int = 200, scheduler: Scheduler = Scheduler.LINEAR
+) -> DiffusionConfig:
+
     # define beta schedule
-    betas = linear_beta_schedule(timesteps=timesteps)
+    match scheduler:
+        case Scheduler.LINEAR:
+            betas = linear_beta_schedule(timesteps=timesteps)
+        case Scheduler.COSINE:
+            betas = cosine_beta_schedule(timesteps=timesteps)
+        case Scheduler.QUADRATIC:
+            betas = quadratic_beta_schedule(timesteps=timesteps)
+        case Scheduler.SIGMOID:
+            betas = sigmoid_beta_schedule(timesteps=timesteps)
+        case _:
+            raise NotImplementedError()
 
     # define alphas
     alphas = 1.0 - betas
@@ -39,6 +58,7 @@ def create_diffusion_config(timesteps: int = 200) -> DiffusionConfig:
 
     return DiffusionConfig(
         timesteps=timesteps,
+        scheduler=scheduler,
         betas=betas,
         alphas=alphas,
         alphas_cumprod=alphas_cumprod,

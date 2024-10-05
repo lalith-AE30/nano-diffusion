@@ -9,46 +9,11 @@ from sample import sample
 from network.unet import Unet
 from forward import p_losses
 
+from schedulers import Scheduler
 from config import create_diffusion_config
 from utils import num_to_groups
 
 import numpy as np
-
-
-# from datasets import load_dataset
-# from torchvision.transforms import Compose
-# from torchvision import transforms
-
-# # load dataset from the hub
-# dataset = load_dataset("fashion_mnist")
-# image_size = 28
-# channels = 1
-# batch_size = 128
-
-# transform = Compose(
-#     [
-#         transforms.RandomHorizontalFlip(),
-#         transforms.ToTensor(),
-#         transforms.Lambda(lambda t: (t * 2) - 1),
-#     ]
-# )
-
-
-# def transforms(examples):
-#     examples["pixel_values"] = [
-#         transform(image.convert("L")) for image in examples["image"]
-#     ]
-#     del examples["image"]
-
-#     return examples
-
-
-# transformed_dataset = dataset.with_transform(transforms).remove_columns("label")
-
-# # create dataloader
-# dataloader = DataLoader(
-#     transformed_dataset["train"], batch_size=batch_size, shuffle=True
-# )
 
 
 # load dataset
@@ -56,13 +21,14 @@ class SpritesDataset(Dataset):
     def __init__(self):
         self.ims = np.load("sprites_1788_16x16.npy").astype(np.float32)
         self.ims = (self.ims / 255) * 2 - 1
-        self.ims = rearrange(self.ims, 'b h w c -> b c h w')
+        self.ims = rearrange(self.ims, "b h w c -> b c h w")
 
     def __len__(self):
         return len(self.ims)
 
     def __getitem__(self, idx):
         return dict(pixel_values=self.ims[idx])
+
 
 dataset = SpritesDataset()
 image_size = 16
@@ -86,7 +52,7 @@ model = Unet(
 )
 model.to(device)
 
-model_name = "sprites_16x3_linear_124.pth"
+model_name = "sprites_16x3_cosine_124.pth"
 
 if Path(model_name).exists():
     model.load_state_dict(torch.load(model_name, map_location=device))
@@ -94,7 +60,7 @@ if Path(model_name).exists():
 optimizer = Adam(model.parameters(), lr=1e-3)
 
 timesteps = 200
-config = create_diffusion_config(timesteps)
+config = create_diffusion_config(timesteps, Scheduler.COSINE)
 
 epochs = 5
 try:
