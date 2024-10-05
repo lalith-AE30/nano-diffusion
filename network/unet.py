@@ -29,8 +29,8 @@ class Unet(nn.Module):
         # determine dimensions
         self.channels = channels
 
-        init_dim = default(init_dim, dim // 3 * 2)
-        self.init_conv = nn.Conv2d(channels, init_dim, 7, padding=3)
+        init_dim = default(init_dim, dim)
+        self.init_conv = nn.Conv2d(channels, init_dim, 1, padding=0)
 
         dims = [init_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
