@@ -98,7 +98,7 @@ try:
                                 image_size,
                                 batch_size=n,
                                 channels=channels,
-                                config=config
+                                config=config,
                             )[-1]
                         ),
                         batches,
