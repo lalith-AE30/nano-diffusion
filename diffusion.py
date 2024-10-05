@@ -1,10 +1,13 @@
 # pip install -q -U einops datasets matplotlib tqdm
 
-import matplotlib.animation as animation
-from torchvision.utils import save_image
+import os
+import torch
+import torch.nn.functional as F
+from torch import nn  # , einsum
 from torch.optim import Adam
-from pathlib import Path
 from torch.utils.data import DataLoader, Dataset
+
+from torchvision.utils import save_image
 from torchvision import transforms
 from torchvision.transforms import (
     Compose,
@@ -14,21 +17,24 @@ from torchvision.transforms import (
     CenterCrop,
     Resize,
 )
+
+from pathlib import Path
 from functools import partial
 
-import matplotlib.pyplot as plt
-from tqdm.auto import tqdm
 import numpy as np
+from tqdm.auto import tqdm
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
-import torch
-from torch import nn  # , einsum
-import torch.nn.functional as F
+from PIL import Image
+from einops import rearrange
 
-from utils import exists, default, extract
+from sample import sample
+from utils import exists, default, extract, num_to_groups
 from resnet import ResnetBlock
 from convnext import ConvNextBlock
 from attention import Attention, LinearAttention
-from schedulers import linear_beta_schedule
+from schedulers import cosine_beta_schedule
 from util_blocks import Residual, PreNorm, Downsample, Upsample
 
 
@@ -40,7 +46,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
     def forward(self, time):
         device = time.device
         half_dim = self.dim // 2
-        embeddings = torch.log(10000) / (half_dim - 1)
+        embeddings = np.log(10000.0) / (half_dim - 1)
         embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings)
         embeddings = time[:, None] * embeddings[None, :]
         embeddings = torch.cat((embeddings.sin(), embeddings.cos()), dim=-1)
@@ -163,10 +169,10 @@ class Unet(nn.Module):
         return self.final_conv(x)
 
 
-timesteps = 200
+timesteps = 1000
 
 # define beta schedule
-betas = linear_beta_schedule(timesteps=timesteps)
+betas = cosine_beta_schedule(timesteps=timesteps)
 
 # define alphas
 alphas = 1.0 - betas
@@ -249,7 +255,8 @@ def p_losses(denoise_model, x_start, t, noise=None, loss_type="l1"):
 # load dataset
 class SpritesDataset(Dataset):
     def __init__(self):
-        self.ims = np.load("sprites_1788_16x16.npy")
+        self.ims = np.load("sprites_1788_16x16.npy").astype(np.float32) / 255.0
+        self.ims = rearrange(self.ims, "b h w c -> b c h w")
 
     def __len__(self):
         return len(self.ims)
@@ -260,33 +267,8 @@ class SpritesDataset(Dataset):
 
 dataset = SpritesDataset()
 image_size = 16
-channels = 3
 batch_size = 128
-
-
-# define function
-# def transforms(examples):
-#     examples["pixel_values"] = [
-#         transform(image.convert("L")) for image in examples["image"]
-#     ]
-#     del examples["image"]
-
-#     return examples
-
-
-# transformed_dataset = dataset.with_transform(transforms).remove_columns("label")
-
-# create dataloader
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-
-def num_to_groups(num, divisor):
-    groups = num // divisor
-    remainder = num % divisor
-    arr = [divisor] * groups
-    if remainder > 0:
-        arr.append(remainder)
-    return arr
+channels = 3
 
 
 results_folder = Path("./results")
@@ -304,112 +286,61 @@ model.to(device)
 
 optimizer = Adam(model.parameters(), lr=1e-3)
 
+model_name = f"sprites_{image_size}x3_"
 
-epochs = 5
+if os.path.exists("sprites_16x3_default_1248.pth"):
+    model.load_state_dict(torch.load("sprites_16x3_default_1248.pth"))
 
-for epoch in range(epochs):
-    for step, batch in enumerate(dataloader):
-        optimizer.zero_grad()
+# create dataloader
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-        batch_size = batch["pixel_values"].shape[0]
-        batch = batch["pixel_values"].to(device)
+resume_training = True
+if resume_training:
+    epochs = 10
+    for epoch in range(epochs):
+        for step, batch in enumerate(dataloader):
+            optimizer.zero_grad()
 
-        # Algorithm 1 line 3: sample t uniformally for every example in the batch
-        t = torch.randint(0, timesteps, (batch_size,), device=device).long()
+            batch_size = batch.shape[0]
+            batch = batch.to(device)
 
-        loss = p_losses(model, batch, t, loss_type="huber")
+            # Algorithm 1 line 3: sample t uniformally for every example in the batch
+            t = torch.randint(0, timesteps, (batch_size,), device=device).long()
 
-        if step % 100 == 0:
-            print("Loss:", loss.item())
+            loss = p_losses(model, batch, t, loss_type="huber")
 
-        loss.backward()
-        optimizer.step()
+            if step % 100 == 0:
+                print("Loss:", loss.item())
 
-        # save generated images
-        if step != 0 and step % save_and_sample_every == 0:
-            milestone = step // save_and_sample_every
-            batches = num_to_groups(4, batch_size)
-            all_images_list = list(
-                map(lambda n: sample(model, batch_size=n, channels=channels), batches)
-            )
-            all_images = torch.cat(all_images_list, dim=0)
-            all_images = (all_images + 1) * 0.5
-            save_image(
-                all_images, str(results_folder / f"sample-{milestone}.png"), nrow=6
-            )
+            loss.backward()
+            optimizer.step()
 
+            # save generated images
+            if step != 0 and step % save_and_sample_every == 0:
+                milestone = step // save_and_sample_every
+                batches = num_to_groups(4, batch_size)
+                all_images_list = list(
+                    map(
+                        lambda n: sample(model, batch_size=n, channels=channels),
+                        batches,
+                    )
+                )
+                all_images = torch.cat(all_images_list, dim=0)
+                all_images = (all_images + 1) * 0.5
+                save_image(
+                    all_images, str(results_folder / f"sample-{milestone}.png"), nrow=6
+                )
+
+    torch.save(model.state_dict(), "sprites_16x3_default_124.pth")
 
 ################################################
 # Sampling from the model
 
-
-@torch.no_grad()
-def p_sample(model, x, t, t_index):
-    betas_t = extract(betas, t, x.shape)
-    sqrt_one_minus_alphas_cumprod_t = extract(sqrt_one_minus_alphas_cumprod, t, x.shape)
-    sqrt_recip_alphas_t = extract(sqrt_recip_alphas, t, x.shape)
-
-    # Equation 11 in the paper
-    # Use our model (noise predictor) to predict the mean
-    model_mean = sqrt_recip_alphas_t * (
-        x - betas_t * model(x, t) / sqrt_one_minus_alphas_cumprod_t
-    )
-
-    if t_index == 0:
-        return model_mean
-    else:
-        posterior_variance_t = extract(posterior_variance, t, x.shape)
-        noise = torch.randn_like(x)
-        # Algorithm 2 line 4:
-        return model_mean + torch.sqrt(posterior_variance_t) * noise
-
-
-# Algorithm 2 but save all images:
-@torch.no_grad()
-def p_sample_loop(model, shape):
-    device = next(model.parameters()).device
-
-    b = shape[0]
-    # start from pure noise (for each example in the batch)
-    img = torch.randn(shape, device=device)
-    imgs = []
-
-    for i in tqdm(
-        reversed(range(0, timesteps)), desc="sampling loop time step", total=timesteps
-    ):
-        img = p_sample(
-            model, img, torch.full((b,), i, device=device, dtype=torch.long), i
-        )
-        imgs.append(img.cpu().numpy())
-    return imgs
-
-
-@torch.no_grad()
-def sample(model, image_size, batch_size=16, channels=3):
-    return p_sample_loop(model, shape=(batch_size, channels, image_size, image_size))
-
-
 # sample 64 images
 samples = sample(model, image_size=image_size, batch_size=64, channels=channels)
 
-random_index = 5
-plt.imshow(
-    samples[-1][random_index].reshape(image_size, image_size, channels), cmap="gray"
-)
-
-plt.show()
-
-random_index = 53
-
-fig = plt.figure()
-ims = []
-for i in range(timesteps):
-    im = plt.imshow(
-        samples[i][random_index].reshape(image_size, image_size, channels),
-        cmap="gray",
-        animated=True,
-    )
-    ims.append([im])
-
-animate = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000)
-animate.save("diffusion.gif")
+Image.fromarray(
+    (
+        rearrange(samples[-1], "(b1 b2) c h w -> (b1 h) (b2 w) c", b1=8, b2=8) * 255
+    ).astype(np.uint8)
+).save("diffusion.png")
