@@ -2,13 +2,14 @@ import torch
 from torch import nn
 
 from pos_embedding import SinusoidalPositionEmbeddings
-from resnet import ResnetBlock
-from convnext import ConvNextBlock
-from attention import Attention, LinearAttention
-from util_blocks import Residual, PreNorm, Upsample, Downsample
+from network.resnet import ResnetBlock
+from network.convnext import ConvNextBlock
+from network.attention import Attention, LinearAttention
+from network.util import Residual, PreNorm, Upsample, Downsample
 
 from functools import partial
 from utils import default, exists
+
 
 class Unet(nn.Module):
     def __init__(
@@ -124,4 +125,3 @@ class Unet(nn.Module):
             x = upsample(x)
 
         return self.final_conv(x)
-

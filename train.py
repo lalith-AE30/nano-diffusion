@@ -1,56 +1,81 @@
 from pathlib import Path
+from einops import rearrange
 import torch
 from torch.optim import Adam
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torchvision.utils import save_image
 
 from sample import sample
-from unet import Unet
+from network.unet import Unet
 from forward import p_losses
 
 from config import create_diffusion_config
 from utils import num_to_groups
 
-from datasets import load_dataset
-from torchvision.transforms import Compose
-from torchvision import transforms
+import numpy as np
 
-# load dataset from the hub
-dataset = load_dataset("fashion_mnist")
-image_size = 28
-channels = 1
+
+# from datasets import load_dataset
+# from torchvision.transforms import Compose
+# from torchvision import transforms
+
+# # load dataset from the hub
+# dataset = load_dataset("fashion_mnist")
+# image_size = 28
+# channels = 1
+# batch_size = 128
+
+# transform = Compose(
+#     [
+#         transforms.RandomHorizontalFlip(),
+#         transforms.ToTensor(),
+#         transforms.Lambda(lambda t: (t * 2) - 1),
+#     ]
+# )
+
+
+# def transforms(examples):
+#     examples["pixel_values"] = [
+#         transform(image.convert("L")) for image in examples["image"]
+#     ]
+#     del examples["image"]
+
+#     return examples
+
+
+# transformed_dataset = dataset.with_transform(transforms).remove_columns("label")
+
+# # create dataloader
+# dataloader = DataLoader(
+#     transformed_dataset["train"], batch_size=batch_size, shuffle=True
+# )
+
+
+# load dataset
+class SpritesDataset(Dataset):
+    def __init__(self):
+        self.ims = np.load("sprites_1788_16x16.npy").astype(np.float32)
+        self.ims = (self.ims / 255) * 2 - 1
+        self.ims = rearrange(self.ims, 'b h w c -> b c h w')
+
+    def __len__(self):
+        return len(self.ims)
+
+    def __getitem__(self, idx):
+        return dict(pixel_values=self.ims[idx])
+
+dataset = SpritesDataset()
+image_size = 16
+channels = 3
 batch_size = 128
 
-transform = Compose(
-    [
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Lambda(lambda t: (t * 2) - 1),
-    ]
-)
-
-
-def transforms(examples):
-    examples["pixel_values"] = [
-        transform(image.convert("L")) for image in examples["image"]
-    ]
-    del examples["image"]
-
-    return examples
-
-
-transformed_dataset = dataset.with_transform(transforms).remove_columns("label")
-
-# create dataloader
-dataloader = DataLoader(
-    transformed_dataset["train"], batch_size=batch_size, shuffle=True
-)
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 results_folder = Path("./results")
 results_folder.mkdir(exist_ok=True)
 for file in results_folder.glob("*"):
     file.unlink()
-save_and_sample_every = 100
+save_and_sample_every = 300
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -60,6 +85,11 @@ model = Unet(
     dim_mults=(1, 2, 4),
 )
 model.to(device)
+
+model_name = "sprites_16x3_linear_124.pth"
+
+if Path(model_name).exists():
+    model.load_state_dict(torch.load(model_name, map_location=device))
 
 optimizer = Adam(model.parameters(), lr=1e-3)
 
@@ -115,4 +145,4 @@ except Exception as e:
     print(f"Error: {e}")
     exit(1)
 
-torch.save(model.state_dict(), "fashion_28x1_linear_124.pth")
+torch.save(model.state_dict(), model_name)

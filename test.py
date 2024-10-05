@@ -1,7 +1,7 @@
 import torch
 
 from config import create_diffusion_config
-from unet import Unet
+from network.unet import Unet
 
 import numpy as np
 from einops import rearrange
@@ -37,4 +37,4 @@ ims = ims.clip(0, 255).astype(np.uint8)
 
 Image.fromarray(
     (rearrange(ims, "(b1 b2) c h w -> (b1 h) (b2 w) c", b1=8, b2=8)).squeeze(), mode="L"
-).save("diffusion.png")
+).save("fashionMNIST_samples.png")
