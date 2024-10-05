@@ -5,3 +5,5 @@ maps/
 *.pth
 *.npy
 diffusion.gif
+
+results/

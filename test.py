@@ -1,5 +1,6 @@
 import torch
 
+from config import create_diffusion_config
 from unet import Unet
 
 import numpy as np
@@ -20,13 +21,20 @@ model = Unet(
 model.to(device)
 
 # load model
-model.load_state_dict(torch.load("sprites_16x3_cosine_124.pth", map_location=device))
+model.load_state_dict(torch.load("fashion_28x1_linear_124.pth", map_location=device))
 
 # sample 64 images
-samples = sample(model, image_size=image_size, batch_size=64, channels=channels)
+samples = sample(
+    model,
+    image_size=image_size,
+    batch_size=64,
+    channels=channels,
+    config=create_diffusion_config(200),
+)
+
+ims = (samples[-1] + 1) * 0.5 * 255
+ims = ims.clip(0, 255).astype(np.uint8)
 
 Image.fromarray(
-    (
-        rearrange(samples[-1], "(b1 b2) c h w -> (b1 h) (b2 w) c", b1=8, b2=8) * 255
-    ).astype(np.uint8).squeeze(), mode="L"
+    (rearrange(ims, "(b1 b2) c h w -> (b1 h) (b2 w) c", b1=8, b2=8)).squeeze(), mode="L"
 ).save("diffusion.png")
