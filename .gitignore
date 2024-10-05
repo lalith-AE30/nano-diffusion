@@ -1,0 +1,6 @@
+__pycache__/
+
+maps/
+
+*.pth
+diffusion.gif
