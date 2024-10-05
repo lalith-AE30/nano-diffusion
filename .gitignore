@@ -3,4 +3,5 @@ __pycache__/
 maps/
 
 *.pth
+*.npy
 diffusion.gif
