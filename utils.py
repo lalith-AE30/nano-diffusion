@@ -1,4 +1,5 @@
 from inspect import isfunction
+import numpy as np
 import torch
 
 def exists(x: any) -> bool:
@@ -23,3 +24,9 @@ def num_to_groups(num, divisor):
     if remainder > 0:
         arr.append(remainder)
     return arr
+
+def to_latent(x: np.ndarray) -> torch.Tensor:
+    return torch.tensor(x).unsqueeze(0) / 255 * 2 - 1
+
+def to_rgb(x: torch.Tensor) -> np.ndarray:
+    return ((x + 1) * 0.5 * 255).detach().cpu().numpy().clip(0, 255).astype(np.uint8)

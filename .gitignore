@@ -4,6 +4,12 @@ maps/
 
 *.pth
 *.npy
+*.ipynb
+
 diffusion.gif
 
 results/
+models/
+img_align_celeba/
+
+dbg.png

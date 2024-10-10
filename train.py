@@ -1,9 +1,11 @@
 from pathlib import Path
 from einops import rearrange
 import torch
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
 from torchvision.utils import save_image
+import torchvision.transforms.v2 as transforms
+from torchvision.transforms.functional import InterpolationMode
 
 from sample import sample
 from network.unet import Unet
@@ -22,6 +24,8 @@ class SpritesDataset(Dataset):
         self.ims = np.load("sprites_1788_16x16.npy").astype(np.float32)
         self.ims = (self.ims / 255) * 2 - 1
         self.ims = rearrange(self.ims, "b h w c -> b c h w")
+        self.ims = torch.Tensor(self.ims)
+        # self.ims = transforms.functional.resize(self.ims, (32, 32), InterpolationMode.NEAREST)
 
     def __len__(self):
         return len(self.ims)
@@ -48,21 +52,23 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 model = Unet(
     dim=image_size,
     channels=channels,
-    dim_mults=(1, 2, 4),
+    dim_mults=(1, 2, 2),
 )
 model.to(device)
 
-model_name = "sprites_16x3_cosine_124.pth"
+# model = torch.compile(model)
 
-if Path(model_name).exists():
-    model.load_state_dict(torch.load(model_name, map_location=device))
+model_name = "sprites_16x3_cosine_122_200.pth"
 
-optimizer = Adam(model.parameters(), lr=1e-3)
+if (Path('models') / model_name).exists():
+    model.load_state_dict(torch.load((Path('models') / model_name), map_location=device))
+
+optimizer = AdamW(model.parameters(), lr=1e-4)
 
 timesteps = 200
 config = create_diffusion_config(timesteps, Scheduler.COSINE)
 
-epochs = 5
+epochs = 20
 try:
     for epoch in range(epochs):
         for step, batch in enumerate(dataloader):
@@ -74,7 +80,9 @@ try:
             # Algorithm 1 line 3: sample t uniformally for every example in the batch
             t = torch.randint(0, timesteps, (batch_size,), device=device).long()
 
-            loss = p_losses(model, batch, t, loss_type="huber")
+            loss = p_losses(
+                model, batch, t, config, loss_type="huber", debug=(step % 100 == 0)
+            )
 
             if step % 100 == 0:
                 print("Loss:", loss.item())

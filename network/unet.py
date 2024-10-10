@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 from torch import nn
 
@@ -14,15 +15,15 @@ from utils import default, exists
 class Unet(nn.Module):
     def __init__(
         self,
-        dim,
-        init_dim=None,
-        out_dim=None,
-        dim_mults=(1, 2, 4, 8),
-        channels=3,
-        with_time_emb=True,
-        resnet_block_groups=8,
-        use_convnext=True,
-        convnext_mult=2,
+        dim: int,
+        init_dim: Optional[int] = None,
+        out_dim: Optional[int] = None,
+        dim_mults: tuple[int, ...] = (1, 2, 4, 8),
+        channels: int = 3,
+        with_time_emb: bool = True,
+        resnet_block_groups: int = 8,
+        use_convnext: bool = True,
+        convnext_mult: int = 2,
     ):
         super().__init__()
 
