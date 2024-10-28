@@ -5,10 +5,13 @@ from tqdm.auto import tqdm
 from config import DiffusionConfig
 from utils import extract
 
+
 @torch.no_grad()
 def p_sample(model, x, t, t_index, config: DiffusionConfig):
     betas_t = extract(config.betas, t, x.shape)
-    sqrt_one_minus_alphas_cumprod_t = extract(config.sqrt_one_minus_alphas_cumprod, t, x.shape)
+    sqrt_one_minus_alphas_cumprod_t = extract(
+        config.sqrt_one_minus_alphas_cumprod, t, x.shape
+    )
     sqrt_recip_alphas_t = extract(config.sqrt_recip_alphas, t, x.shape)
 
     # Equation 11 in the paper
@@ -37,15 +40,25 @@ def p_sample_loop(model, shape, config: DiffusionConfig):
     imgs = []
 
     for i in tqdm(
-        reversed(range(0, config.timesteps)), desc="sampling loop time step", total=config.timesteps
+        reversed(range(0, config.timesteps)),
+        desc="sampling loop time step",
+        total=config.timesteps,
     ):
         img = p_sample(
-            model, img, torch.full((b,), i, device=device, dtype=torch.long), i, config)
+            model, img, torch.full((b,), i, device=device, dtype=torch.long), i, config
+        )
         imgs.append(img.cpu().numpy())
     return imgs
 
 
 @torch.no_grad()
-def sample(model, image_size, config: DiffusionConfig, batch_size=16, channels=3, ):
-    return p_sample_loop(model, shape=(batch_size, channels, image_size, image_size), config=config)
-
+def sample(
+    model,
+    image_size,
+    config: DiffusionConfig,
+    batch_size=16,
+    channels=3,
+):
+    return p_sample_loop(
+        model, shape=(batch_size, channels, image_size, image_size), config=config
+    )

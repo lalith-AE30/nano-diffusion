@@ -16,6 +16,7 @@ from config import create_diffusion_config
 from utils import num_to_groups
 
 import numpy as np
+from torchvision.datasets import CIFAR10
 
 
 # load dataset
@@ -31,9 +32,16 @@ class SpritesDataset(Dataset):
         return len(self.ims)
 
     def __getitem__(self, idx):
-        return dict(pixel_values=self.ims[idx])
+        return self.ims[idx], 0
 
+transform = transforms.Compose([
+    transforms.ToImage(),
+    transforms.ToDtype(torch.float32, scale=True),
+    transforms.ToPureTensor(),
+    transforms.Lambda(lambda x: x * 2 - 1),
+])
 
+# dataset = CIFAR10(root='./data', train=True, download=True, transform=transform)
 dataset = SpritesDataset()
 image_size = 16
 channels = 3
@@ -50,32 +58,34 @@ save_and_sample_every = 300
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 model = Unet(
-    dim=image_size,
+    dim=32,
     channels=channels,
-    dim_mults=(1, 2, 2),
+    dim_mults=(1, 2, 4),
 )
 model.to(device)
 
 # model = torch.compile(model)
 
-model_name = "sprites_16x3_cosine_122_200.pth"
+models_path = Path('models')
+model_name = "exp(dim=32)_sprites_16x3_linear_124_320.pth"
 
-if (Path('models') / model_name).exists():
-    model.load_state_dict(torch.load((Path('models') / model_name), map_location=device))
+if (models_path / model_name).exists():
+    model.load_state_dict(torch.load(models_path / model_name, map_location=device))
+    print("Found checkpoint, resuming training...")
 
-optimizer = AdamW(model.parameters(), lr=1e-4)
+optimizer = AdamW(model.parameters(), lr=1e-3)
 
-timesteps = 200
-config = create_diffusion_config(timesteps, Scheduler.COSINE)
+timesteps = 320
+config = create_diffusion_config(timesteps, Scheduler.LINEAR)
 
 epochs = 20
 try:
     for epoch in range(epochs):
-        for step, batch in enumerate(dataloader):
+        for step, (batch, _) in enumerate(dataloader):
             optimizer.zero_grad()
 
-            batch_size = batch["pixel_values"].shape[0]
-            batch = batch["pixel_values"].to(device)
+            batch_size = batch.shape[0]
+            batch = batch.to(device)
 
             # Algorithm 1 line 3: sample t uniformally for every example in the batch
             t = torch.randint(0, timesteps, (batch_size,), device=device).long()
@@ -114,9 +124,11 @@ try:
                     all_images, str(results_folder / f"sample-{milestone}.png"), nrow=6
                 )
 except KeyboardInterrupt:
-    print("KeyboardInterrupt: saving model")
+    print("KeyboardInterrupt: save model?")
+    if input() in ["N", "n"]:
+        exit(0)
 except Exception as e:
     print(f"Error: {e}")
     exit(1)
 
-torch.save(model.state_dict(), model_name)
+torch.save(model.state_dict(), models_path / model_name)

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 import torch
 from torch import nn
 
@@ -33,9 +33,6 @@ class Unet(nn.Module):
         init_dim = default(init_dim, dim)
         self.init_conv = nn.Conv2d(channels, init_dim, 1, padding=0)
 
-        dims = [init_dim, *map(lambda m: dim * m, dim_mults)]
-        in_out = list(zip(dims[:-1], dims[1:]))
-
         if use_convnext:
             block_klass = partial(ConvNextBlock, mult=convnext_mult)
         else:
@@ -55,9 +52,12 @@ class Unet(nn.Module):
             self.time_mlp = None
 
         # layers
+        dims: List[int] = [init_dim, *map(lambda m: dim * m, dim_mults)]
+        in_out = list(zip(dims, dims[1:]))
+        num_resolutions = len(in_out)
+
         self.downs = nn.ModuleList([])
         self.ups = nn.ModuleList([])
-        num_resolutions = len(in_out)
 
         for ind, (dim_in, dim_out) in enumerate(in_out):
             is_last = ind >= (num_resolutions - 1)
@@ -98,11 +98,11 @@ class Unet(nn.Module):
         )
 
     def forward(self, x, time):
-        x = self.init_conv(x)
-
         t = self.time_mlp(time) if exists(self.time_mlp) else None
 
         h = []
+
+        x = self.init_conv(x)
 
         # downsample
         for block1, block2, attn, downsample in self.downs:

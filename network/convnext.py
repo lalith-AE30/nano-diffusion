@@ -3,6 +3,7 @@ from einops import rearrange
 
 from utils import exists
 
+
 class ConvNextBlock(nn.Module):
     """https://arxiv.org/abs/2201.03545"""
 
@@ -36,4 +37,3 @@ class ConvNextBlock(nn.Module):
 
         h = self.net(h)
         return h + self.res_conv(x)
-

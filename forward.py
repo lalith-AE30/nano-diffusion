@@ -39,7 +39,6 @@ def p_losses(
     predicted_noise = denoise_model(x_noisy, t)
 
     if debug:
-        print(x_noisy.max(), x_noisy.min())
         im = [
             rearrange(
                 to_rgb(x_start),
@@ -54,13 +53,13 @@ def p_losses(
         )
         im.append(
             rearrange(
-                to_rgb(predicted_noise),
+                to_rgb(predicted_noise-noise),
                 "b c h w-> h (b w) c",
             )
         )
         im.append(
             rearrange(
-                to_rgb(noise),
+                to_rgb(noise-noise),
                 "b c h w-> h (b w) c",
             )
         )

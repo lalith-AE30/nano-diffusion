@@ -11,11 +11,14 @@ from PIL import Image
 from sample import sample
 from schedulers import Scheduler
 
-model_name = "sprites_16x3_cosine_122_200.pth"
+# model_name = "sprites_16x3_linear_124_200.compiled.pth"
+# model_name = "CIFAR_32x3_linear_124_200.pth"
+model_name = "sprites_16x3_linear_124_320.pth"
 
 _, ic, sch, mul, timesteps = model_name[:model_name.find('.')].split('_')
 
 timesteps = int(timesteps)
+timesteps = 200
 
 image_size, channels = map(int, ic.split('x'))
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -43,6 +46,8 @@ match sch:
 
 # load model
 model.load_state_dict(torch.load(Path('models') / model_name, map_location=device))
+
+torch.random.manual_seed(69)
 
 # sample 64 images
 samples = sample(
