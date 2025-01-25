@@ -33,7 +33,7 @@ def sigmoid_beta_schedule(timesteps):
 
 
 
-class Scheduler(Enum):
+class SchedulerCurve(Enum):
     LINEAR = "linear"
     COSINE = "cosine"
     QUADRATIC = "quadratic"

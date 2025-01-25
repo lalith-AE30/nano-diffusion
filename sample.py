@@ -1,13 +1,15 @@
+import logging
 import torch
 
 from tqdm.auto import tqdm
 
-from config import DiffusionConfig
+from scheduler import Schedules
 from utils import extract
 
+logger = logging.getLogger(__name__)
 
 @torch.no_grad()
-def p_sample(model, x, t, t_index, config: DiffusionConfig):
+def p_sample(model, x, t, t_index, config: Schedules) -> torch.Tensor:
     betas_t = extract(config.betas, t, x.shape)
     sqrt_one_minus_alphas_cumprod_t = extract(
         config.sqrt_one_minus_alphas_cumprod, t, x.shape
@@ -31,22 +33,23 @@ def p_sample(model, x, t, t_index, config: DiffusionConfig):
 
 # Algorithm 2 but save all images:
 @torch.no_grad()
-def p_sample_loop(model, shape, config: DiffusionConfig):
+def p_sample_loop(model, shape, config: Schedules):
     device = next(model.parameters()).device
 
     b = shape[0]
     # start from pure noise (for each example in the batch)
     img = torch.randn(shape, device=device)
-    imgs = []
+    imgs = [img.cpu().numpy()]
 
     for i in tqdm(
         reversed(range(0, config.timesteps)),
-        desc="sampling loop time step",
+        desc="Sampling Progress",
         total=config.timesteps,
+        disable=logger.level > logging.INFO
     ):
         img = p_sample(
             model, img, torch.full((b,), i, device=device, dtype=torch.long), i, config
-        )
+        ).clip(-1, 1)
         imgs.append(img.cpu().numpy())
     return imgs
 
@@ -55,7 +58,7 @@ def p_sample_loop(model, shape, config: DiffusionConfig):
 def sample(
     model,
     image_size,
-    config: DiffusionConfig,
+    config: Schedules,
     batch_size=16,
     channels=3,
 ):

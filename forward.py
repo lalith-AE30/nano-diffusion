@@ -1,14 +1,12 @@
-from einops import rearrange
-import numpy as np
 import torch
 import torch.nn.functional as F
 
-from utils import extract, to_rgb
-from config import DiffusionConfig, create_diffusion_config
+from utils import extract
+from scheduler import Schedules
 
 
 # forward diffusion
-def q_sample(x_start, t, config: DiffusionConfig, noise=None):
+def q_sample(x_start, t, config: Schedules, noise=None):
     if noise is None:
         noise = torch.randn_like(x_start)
 
@@ -20,14 +18,11 @@ def q_sample(x_start, t, config: DiffusionConfig, noise=None):
     return sqrt_alphas_cumprod_t * x_start + sqrt_one_minus_alphas_cumprod_t * noise
 
 
-from PIL import Image
-
-
 def p_losses(
     denoise_model,
     x_start,
     t,
-    config: DiffusionConfig,
+    config: Schedules,
     noise=None,
     loss_type="l1",
     debug=False,
@@ -38,33 +33,6 @@ def p_losses(
     x_noisy = q_sample(x_start=x_start, t=t, config=config, noise=noise)
     predicted_noise = denoise_model(x_noisy, t)
 
-    if debug:
-        im = [
-            rearrange(
-                to_rgb(x_start),
-                "b c h w-> h (b w) c",
-            )
-        ]
-        im.append(
-            rearrange(
-                to_rgb(x_noisy),
-                "b c h w-> h (b w) c",
-            )
-        )
-        im.append(
-            rearrange(
-                to_rgb(predicted_noise-noise),
-                "b c h w-> h (b w) c",
-            )
-        )
-        im.append(
-            rearrange(
-                to_rgb(noise-noise),
-                "b c h w-> h (b w) c",
-            )
-        )
-        Image.fromarray(np.concatenate(im)).save("dbg.png")
-
     if loss_type == "l1":
         loss = F.l1_loss(noise, predicted_noise)
     elif loss_type == "l2":
@@ -74,4 +42,6 @@ def p_losses(
     else:
         raise NotImplementedError()
 
-    return loss
+    if debug:
+        return (loss, x_start, x_noisy, predicted_noise, noise)
+    return (loss,)
