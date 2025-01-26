@@ -30,7 +30,7 @@ save_and_sample_every = 300
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-model_path = "blocks_cosine.pth"
+model_path = "./models/blocks_cosine.pth"
 
 if Path(model_path).exists():
     trainer = Trainer.from_checkpoint(model_path, dataset, device=device)
