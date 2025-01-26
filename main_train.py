@@ -3,7 +3,7 @@ from pathlib import Path
 import torchvision.transforms.v2 as transforms
 
 from datasets import BlocksDataset
-from schedule_curves import cosine_beta_schedule
+from diffusion_schedules.schedule_curves import cosine_beta_schedule
 from trainer import OptimizerType, Trainer
 import logging
 

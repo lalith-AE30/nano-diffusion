@@ -3,7 +3,7 @@ import torch
 
 from tqdm.auto import tqdm
 
-from scheduler import Schedules
+from diffusion_schedules.scheduler import Schedules
 from utils import extract
 
 logger = logging.getLogger(__name__)

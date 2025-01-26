@@ -2,7 +2,7 @@ from typing import List, Optional
 import torch
 from torch import nn
 
-from pos_embedding import SinusoidalPositionEmbeddings
+from network.pos_embedding import SinusoidalPositionEmbeddings
 from network.resnet import ResnetBlock
 from network.convnext import ConvNextBlock
 from network.attention import Attention, LinearAttention

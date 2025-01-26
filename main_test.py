@@ -5,7 +5,7 @@ from PIL import Image
 from einops import rearrange
 from network.unet import Unet
 from sample import sample
-from scheduler import Schedules
+from diffusion_schedules.scheduler import Schedules
 
 def load_model_from_checkpoint(ckpt, device):
     ckpt = torch.load(ckpt, map_location=device, weights_only=True)

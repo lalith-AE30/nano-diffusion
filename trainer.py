@@ -10,7 +10,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
-from scheduler import Schedules
+from diffusion_schedules.scheduler import Schedules
 from sample import sample
 from network.unet import Unet
 from forward import p_losses

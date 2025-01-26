@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 
 from utils import extract
-from scheduler import Schedules
+from diffusion_schedules.scheduler import Schedules
 
 
 # forward diffusion

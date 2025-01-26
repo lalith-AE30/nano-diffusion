@@ -6,8 +6,8 @@ from pathlib import Path
 from trainer import Trainer
 from network.unet import Unet
 from torch.optim import AdamW
-from schedule_curves import SchedulerCurve
-from scheduler import Schedules
+from diffusion_schedules.schedule_curves import SchedulerCurve
+from diffusion_schedules.scheduler import Schedules
 from torchvision.datasets import CIFAR10
 
 

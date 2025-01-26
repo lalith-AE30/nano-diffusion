@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
-from schedule_curves import (
+from diffusion_schedules.schedule_curves import (
     linear_beta_schedule,
     cosine_beta_schedule,
     quadratic_beta_schedule,
