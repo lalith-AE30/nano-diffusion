@@ -46,7 +46,7 @@ class Trainer:
         self.betas = betas
         self.config = Schedules.create_from_betas(betas)
         self.dataset = dataset
-        # self.batch_size = batch_size
+        self.losses = []
         self.logging_interval = logging_interval
         self.results_folder = results_folder
         self.save_and_sample_every = save_and_sample_every
@@ -66,25 +66,29 @@ class Trainer:
                 self.optimizer = torch.optim.SGD(
                     self.model.parameters(), **optimizer_config["params"]
                 )
-        if data_shape and data_shape != self.dataset.data[0].shape:
+        instance = next(iter(DataLoader(self.dataset, batch_size=1)))
+        if type(instance) == tuple or type(instance) == list:  # noqa: E721
+            instance = instance[0]
+        if data_shape and data_shape != instance.shape[1:]:
             return ValueError("Data shape does not match model input shape")
         if not data_shape:
-            self.model_config["image_size"] = self.dataset.data[0].shape
+            self.model_config["image_size"] = instance.shape[1:]
         if to_compile:
             self.model.compile()
-        if self.dataset.data[0].shape[0] == self.dataset.data[0].shape[1]:
-            self.image_size = self.dataset.data[0].shape[0]
+        if instance.shape[2] == instance.shape[3]:
+            self.image_size = instance.shape[2]
         else:
             return ValueError("Image is not square")
-        if len(self.dataset.data[0].shape) > 2:
-            self.channels = self.dataset.data[0].shape[2]
+        if len(instance.shape) > 3:
+            self.channels = instance.shape[1]
         else:
             self.channels = 1
 
     def train(self, batch_size, epochs):
         dataloader = DataLoader(
-            self.dataset, batch_size=batch_size, shuffle=True, drop_last=True
+            self.dataset, batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=True
         )
+        steps_taken = 0
         for _ in range(epochs):
             for step, (batch, _) in enumerate(dataloader):
                 self.optimizer.zero_grad()
@@ -102,19 +106,21 @@ class Trainer:
                     t,
                     self.config,
                     loss_type="huber",
-                    debug=(step % self.logging_interval == 0),
+                    debug=(steps_taken % self.logging_interval == 0),
                 )
                 loss.backward()
                 self.optimizer.step()
+                self.losses.append(loss.item())
 
-                if step % self.logging_interval == 0:
-                    logger.info(f"loss: {loss.item()}")
+                if steps_taken % self.logging_interval == 0:
+                    logger.info(f"loss={loss.item()}, {steps_taken=}")
                     self.save_debug_image(*debug_data)
+                steps_taken += 1
 
                 # save generated images
                 if (
                     self.save_and_sample_every != 0
-                    and step % self.save_and_sample_every == 0
+                    and steps_taken % self.save_and_sample_every == 0
                 ):
                     milestone = (
                         step + self.epochs * len(dataloader)
@@ -131,6 +137,7 @@ class Trainer:
                 "optimizer_config": self.optimizer_config,
                 "epochs": self.epochs,
                 "betas": self.betas,
+                "losses": self.losses,
             },
             path,
         )
@@ -214,6 +221,7 @@ class Trainer:
             device=device,
         )
 
+        trainer.losses = ckpt["losses"]
         trainer.model.load_state_dict(ckpt["model"])
         trainer.optimizer.load_state_dict(ckpt["optimizer"])
         trainer.epochs = ckpt["epochs"]

@@ -24,16 +24,15 @@ def load_model_from_checkpoint(ckpt, device):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 model, betas, image_shape = load_model_from_checkpoint(
-    "./linear_type.pth", device
+    "./blocks_cosine.pth", device
 )
 config = Schedules.create_from_betas(betas)
-
 # sample 64 images
 samples = sample(
     model,
-    image_size=image_shape[0],
+    image_size=image_shape[1],
     batch_size=64,
-    channels=image_shape[2],
+    channels=image_shape[0],
     config=config,
 )
 
@@ -42,4 +41,4 @@ ims = ims.clip(0, 255).astype(np.uint8)
 
 Image.fromarray(
     (rearrange(ims, "(b1 b2) c h w -> (b1 h) (b2 w) c", b1=8, b2=8)).squeeze()
-).save("CIFAR_samples.png")
+).save("Minecraft_samples.png")
