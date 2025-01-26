@@ -32,7 +32,7 @@ class ResnetBlock(nn.Module):
         dim_out: int,
         *,
         time_emb_dim: Optional[int] = None,
-        groups: int = 8
+        groups: int = 8,
     ):
         super().__init__()
         self.mlp = (
